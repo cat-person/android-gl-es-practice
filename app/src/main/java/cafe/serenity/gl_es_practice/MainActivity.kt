@@ -1,14 +1,15 @@
 package cafe.serenity.gl_es_practice
 
+import android.graphics.Color
+import android.graphics.PointF
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLSurfaceView.Renderer
-import android.opengl.Matrix
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import androidx.core.graphics.toColor
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -19,14 +20,14 @@ class MainActivity : AppCompatActivity() {
         val glSurfaceView = GLSurfaceView(this).also {
             it.setEGLContextClientVersion(2)
             it.setRenderer(object: Renderer{
-                private lateinit var triangle: Triangle
+                private lateinit var triangle: GLShape
 
                 override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
                     assert(gl != null)
                     gl?.apply {
                         gl.glClearColor(1.0f, 1.0f, 1.0f, 1.0f)
                     }
-                    triangle = Triangle()
+                    triangle = GLShape(MonochromaticTriangleGLDescriptor(arrayOf(PointF(-.5f, -.5f), PointF(.0f, .8f), PointF(.5f, -.5f)), Color.BLACK.toColor()))
                 }
 
                 override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -37,8 +38,8 @@ class MainActivity : AppCompatActivity() {
                         // make adjustments for screen ratio
                         val ratio: Float = width.toFloat() / height.toFloat()
 
-                        glMatrixMode(GL10.GL_PROJECTION)            // set matrix to projection mode
-                        glLoadIdentity()                            // reset the matrix to its default state
+                        glMatrixMode(GL10.GL_PROJECTION)                                   // set matrix to projection mode
+                        glLoadIdentity()                                                   // reset the matrix to its default state
                         glFrustumf(-ratio, ratio, -1f, 1f, 3f, 7f)  // apply the projection matrix
                     }
                 }
@@ -56,54 +57,64 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-class Triangle {
-    // number of coordinates per vertex in this array
-    // number of coordinates per vertex in this array
-    private val coordsPerVertex = 3
-    private var triangleCoords = floatArrayOf(     // in counterclockwise order:
-        0.0f, 0.622008459f, 0.0f,      // top
-        -0.5f, -0.311004243f, 0.0f,    // bottom left
-        0.5f, -0.311004243f, 0.0f      // bottom right
-    )
+
+interface Shape2DGLDescriptor {
+    val vShaderCode: String
+    val fShaderCode: String
+    val transformationMatrix: FloatArray // 2x2 matrix
+}
 
 
-    // Set color with red, green, blue and alpha (opacity) values
-    val color = floatArrayOf(0.63671875f, 0.76953125f, 0.22265625f, 1.0f)
-    private var vertexBuffer: FloatBuffer =
-        // (number of coordinate values * 4 bytes per float)
-        ByteBuffer.allocateDirect(triangleCoords.size * 4).run {
-            // use the device hardware's native byte order
-            order(ByteOrder.nativeOrder())
-            // create a floating point buffer from the ByteBuffer
-            asFloatBuffer().apply {
-                // add the coordinates to the FloatBuffer
-                put(triangleCoords)
-                // set the buffer to read the first coordinate
-                position(0)
-            }
-        }
+sealed class Attribute(val stride: Int, val size: Int) {
+    class Coordinates2D(val points: Array<PointF>): Attribute(8, 24)
+}
 
-    private val vertexShaderCode =
+sealed class Uniform {
+    class ColorUniform(val color: Color) : Uniform()
+}
+// A bit of interface segregation
+interface Shape2DGLAttributesDescriptor {
+    val attributes: Array<Attribute>
+}
+
+interface Shape2DGLUniformsDescriptor {
+    val uniforms: Array<Uniform>
+}
+
+class MonochromaticTriangleGLDescriptor(val coords: Array<PointF>, val color: Color): Shape2DGLDescriptor, Shape2DGLAttributesDescriptor, Shape2DGLUniformsDescriptor{
+    override val vShaderCode =
         "attribute vec4 vPosition;" +
                 "void main() {" +
                 "  gl_Position = vPosition;" +
                 "}"
 
-    private val fragmentShaderCode =
+    override val fShaderCode =
         "precision mediump float;" +
                 "uniform vec4 vColor;" +
                 "void main() {" +
                 "  gl_FragColor = vColor;" +
                 "}"
 
-    private var mProgram: Int
+    override val attributes = arrayOf(Attribute.Coordinates2D(coords) as Attribute)
+
+    override val uniforms = arrayOf(Uniform.ColorUniform(Color.DKGRAY.toColor()) as Uniform)
+
+    override val transformationMatrix = floatArrayOf(1f, 1f, 1f, 1f)
+}
+
+class GLShape(val descriptor: Shape2DGLDescriptor) {
+    private val coordsPerVertex = 2 // I cant see a way for sane abstract implementation here
+    private val coordsByteSize = 4
+
+    private val program: Int
+
+    val color = floatArrayOf(0.63671875f, 0.76953125f, 0.22265625f, 1.0f)
 
     init {
-        val vertexShader: Int = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
-        val fragmentShader: Int = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
+        val vertexShader: Int = loadShader(GLES20.GL_VERTEX_SHADER, descriptor.vShaderCode)
+        val fragmentShader: Int = loadShader(GLES20.GL_FRAGMENT_SHADER, descriptor.fShaderCode)
 
-        // create empty OpenGL ES Program
-        mProgram = GLES20.glCreateProgram().also {
+        program = GLES20.glCreateProgram().also {
             // add the vertex shader to program
             GLES20.glAttachShader(it, vertexShader)
 
@@ -115,50 +126,64 @@ class Triangle {
         }
     }
 
-    private var positionHandle: Int = 0
-    private var mColorHandle: Int = 0
-
-    private val vertexCount: Int = triangleCoords.size / coordsPerVertex
-    private val vertexStride: Int = coordsPerVertex * 4 // 4 bytes per vertex
-
     fun draw() {
-        // Add program to OpenGL ES environment
-        GLES20.glUseProgram(mProgram)
+        GLES20.glUseProgram(program)
 
         // get handle to vertex shader's vPosition member
-        positionHandle = GLES20.glGetAttribLocation(mProgram, "vPosition").also {
+        val positionHandle = GLES20.glGetAttribLocation(program, "vPosition").also {
 
-            // Enable a handle to the triangle vertices
-            GLES20.glEnableVertexAttribArray(it)
+            if(descriptor is Shape2DGLAttributesDescriptor) {
+                GLES20.glEnableVertexAttribArray(it)
 
-            // Prepare the triangle coordinate data
-            GLES20.glVertexAttribPointer(
-                it,
-                coordsPerVertex,
-                GLES20.GL_FLOAT,
-                false,
-                vertexStride,
-                vertexBuffer
-            )
+                val requiredBufferSize = descriptor.attributes.sumOf { it.size }
+
+                val buffer = ByteBuffer.allocateDirect(requiredBufferSize).run {
+                    order(ByteOrder.nativeOrder())
+                }
+
+                descriptor.attributes.forEach { attribute ->
+                    if( attribute is Attribute.Coordinates2D) {
+                        val coordinatesArray = FloatArray(attribute.points.size * 2)
+
+                        attribute.points.forEachIndexed { idx, point ->
+                            coordinatesArray[2 * idx] = point.x
+                            coordinatesArray[2 * idx + 1] = point.y
+                        }
+
+                        buffer.asFloatBuffer().put(coordinatesArray)
+                    }
+                }
+
+                GLES20.glVertexAttribPointer(
+                    it,
+                    coordsPerVertex,
+                    GLES20.GL_FLOAT,
+                    false,
+                    coordsPerVertex * coordsByteSize,
+                    buffer
+                )
+
+            }
 
             // get handle to fragment shader's vColor member
-            mColorHandle = GLES20.glGetUniformLocation(mProgram, "vColor").also { colorHandle ->
+
+            GLES20.glGetUniformLocation(program, "vColor").also { colorHandle ->
                 // Set color for drawing the triangle
                 GLES20.glUniform4fv(colorHandle, 1, color, 0)
             }
 
             // Draw the triangle
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3)
 
             // Disable vertex array
             GLES20.glDisableVertexAttribArray(it)
         }
     }
-}
 
-fun loadShader(type: Int, shaderCode: String): Int {
-    return GLES20.glCreateShader(type).also { shader ->
-        GLES20.glShaderSource(shader, shaderCode)
-        GLES20.glCompileShader(shader)
+    private fun loadShader(type: Int, shaderCode: String): Int {
+        return GLES20.glCreateShader(type).also { shader ->
+            GLES20.glShaderSource(shader, shaderCode)
+            GLES20.glCompileShader(shader)
+        }
     }
 }
