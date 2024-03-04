@@ -14,6 +14,9 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,13 +27,17 @@ class MainActivity : AppCompatActivity() {
             it.setRenderer(object: Renderer{
                 private lateinit var triangle: GLShape
                 private var ratio: Float = 0f
+                private lateinit var triangleDescriptor: MonochromaticTriangleGLDescriptor
 
                 override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
                     assert(gl != null)
                     gl?.apply {
                         gl.glClearColor(1.0f, 1.0f, 1.0f, 1.0f)
                     }
-                    triangle = GLShape(MonochromaticTriangleGLDescriptor(arrayOf(PointF(-.5f, -.5f), PointF(.0f, .8f), PointF(.5f, -.5f)), Color.BLACK.toColor()))
+                    triangleDescriptor = MonochromaticTriangleGLDescriptor(arrayOf(PointF(-.5f, -.5f), PointF(.0f, .8f), PointF(.5f, -.5f)), Color.DKGRAY.toColor())
+                    triangleDescriptor.setRotation(45f)
+                    triangle = GLShape(triangleDescriptor)
+                    triangle.descriptor
                 }
 
                 override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -77,7 +84,7 @@ sealed class Attribute(val stride: Int, val size: Int) {
 
 sealed class Uniform(val size: Int) {
     class ColorUniform(val color: Color) : Uniform(4 * 4)
-    class ProjectionMatrixUniform(val matrix: Matrix): Uniform(9 * 4)
+    class ProjectionMatrixUniform(val rotationMatrixArray: FloatArray): Uniform(9 * 4)
 }
 // A bit of interface segregation
 interface Shape2DGLAttributesDescriptor {
@@ -90,7 +97,7 @@ interface Shape2DGLUniformsDescriptor {
 
 class MonochromaticTriangleGLDescriptor(coords: Array<PointF>, val color: Color): Shape2DGLDescriptor, Shape2DGLAttributesDescriptor, Shape2DGLUniformsDescriptor{
     override val vShaderCode =
-        "uniform mat2 uMVPMatrix;" +
+        "uniform mat2 rotationMatrix;" +
         "uniform float scaleX;" +
         "uniform float scaleY;" +
 
@@ -99,7 +106,8 @@ class MonochromaticTriangleGLDescriptor(coords: Array<PointF>, val color: Color)
         // the matrix must be included as a modifier of gl_Position
         // Note that the uMVPMatrix factor *must be first* in order
         // for the matrix multiplication product to be correct.
-        "  gl_Position = vec4(vPosition.x * scaleX, vPosition.y * scaleY, 0.0, 1.0);" +
+        "  vec2 rotatedPosition = rotationMatrix * vPosition;" +
+        "  gl_Position = vec4(rotatedPosition.x * scaleX, rotatedPosition.y * scaleY, 0.0, 1.0);" +
         "}"
 
     override val fShaderCode =
@@ -111,15 +119,23 @@ class MonochromaticTriangleGLDescriptor(coords: Array<PointF>, val color: Color)
 
     override val attributes = arrayOf(Attribute.Coordinates2D(coords) as Attribute)
 
-    private val transformationMatrix = Matrix()
-
-    override val uniforms = arrayOf(
-        Uniform.ProjectionMatrixUniform(transformationMatrix) as Uniform,
-        Uniform.ColorUniform(Color.DKGRAY.toColor()) as Uniform,
+    private var transformationMatrix = floatArrayOf(
+        1f, 0f,
+        0f, 1f,
     )
 
-    fun setRotate(degrees: Float) {
-//        transformationMatrix.setRotate(degrees)
+    override val uniforms get() = arrayOf(
+        Uniform.ProjectionMatrixUniform(transformationMatrix) as Uniform,
+        Uniform.ColorUniform(color) as Uniform,
+    )
+
+    fun setRotation(degrees: Float) {
+        val radians = ( PI.toFloat() * degrees )/ 180f
+
+        transformationMatrix = floatArrayOf(
+            cos(radians), -sin(radians),
+            sin(radians), cos(radians),
+        )
     }
 }
 
@@ -180,23 +196,18 @@ class GLShape(val descriptor: Shape2DGLDescriptor) {
             }
 
             if ( descriptor is Shape2DGLUniformsDescriptor ) {
-
-                var uniformOffset = 0
-
                 descriptor.uniforms.forEach { uniform ->
                     if( uniform is Uniform.ColorUniform ) {
                         GLES20.glGetUniformLocation(program, "vColor").also { colorHandle ->
-                            GLES20.glUniform4fv(colorHandle, 1, uniform.color.components, uniformOffset)
+                            GLES20.glUniform4fv(colorHandle, 1, uniform.color.components, 0)
                         }
 
 
                     } else if (uniform is Uniform.ProjectionMatrixUniform) {
-
-//                        GLES20.glGetUniformLocation(program, "uMVPMatrix").also {uMVPMatrixHandle ->
-//                            GLES20.glUniformMatrix3fv(uMVPMatrixHandle, 1, false, Matrix.IDENTITY_MATRIX.values(), uniformOffset)
-//                        }
+                        GLES20.glGetUniformLocation(program, "rotationMatrix").also {rotationMatrixHandle ->
+                            GLES20.glUniformMatrix2fv(rotationMatrixHandle, 1, false, uniform.rotationMatrixArray, 0)
+                        }
                     }
-//                    uniformOffset += uniform.size
                 }
             }
 
