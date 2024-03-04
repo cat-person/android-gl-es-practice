@@ -5,11 +5,10 @@ import android.graphics.PointF
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLSurfaceView.Renderer
-import android.opengl.Matrix
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.toColor
-import androidx.core.graphics.values
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
@@ -18,9 +17,35 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
+
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        lateinit var fShaderCode: String
+        lateinit var vShaderCode: String
+
+        try {
+            val stream = assets.open("triangle_vertex_shader.glsl")
+            val size = stream.available()
+            val buffer = ByteArray(size)
+            stream.read(buffer)
+            stream.close()
+            vShaderCode = String(buffer)
+        } catch (e: IOException) {
+            // Log it
+        }
+
+        try {
+            val stream = assets.open("triangle_fragment_shader.glsl")
+            val size = stream.available()
+            val buffer = ByteArray(size)
+            stream.read(buffer)
+            stream.close()
+            fShaderCode = String(buffer)
+        } catch (e: IOException) {
+            // Log it
+        }
 
         val glSurfaceView = GLSurfaceView(this).also {
             it.setEGLContextClientVersion(2)
@@ -34,8 +59,15 @@ class MainActivity : AppCompatActivity() {
                     gl?.apply {
                         gl.glClearColor(1.0f, 1.0f, 1.0f, 1.0f)
                     }
-                    triangleDescriptor = MonochromaticTriangleGLDescriptor(arrayOf(PointF(-.5f, -.5f), PointF(.0f, .8f), PointF(.5f, -.5f)), Color.DKGRAY.toColor())
-                    triangleDescriptor.setRotation(45f)
+                    triangleDescriptor = MonochromaticTriangleGLDescriptor(
+                        vShaderCode,
+                        fShaderCode,
+                        arrayOf(
+                            PointF(-.5f, -.5f),
+                            PointF(.0f, .7f),
+                            PointF(.5f, -.5f)),
+                        Color.DKGRAY.toColor())
+                    triangleDescriptor.setRotation(-45f)
                     triangle = GLShape(triangleDescriptor)
                     triangle.descriptor
                 }
@@ -45,7 +77,6 @@ class MainActivity : AppCompatActivity() {
                     gl?.apply {
                         glViewport(0, 0, width, height)
 
-                        // make adjustments for screen ratio
                         ratio = width.toFloat() / height.toFloat()
 
                         glMatrixMode(GL10.GL_PROJECTION)                                   // set matrix to projection mode
@@ -71,7 +102,6 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-
 interface Shape2DGLDescriptor {
     val vShaderCode: String
     val fShaderCode: String
@@ -95,28 +125,7 @@ interface Shape2DGLUniformsDescriptor {
     val uniforms: Array<Uniform>
 }
 
-class MonochromaticTriangleGLDescriptor(coords: Array<PointF>, val color: Color): Shape2DGLDescriptor, Shape2DGLAttributesDescriptor, Shape2DGLUniformsDescriptor{
-    override val vShaderCode =
-        "uniform mat2 rotationMatrix;" +
-        "uniform float scaleX;" +
-        "uniform float scaleY;" +
-
-        "attribute vec2 vPosition;" +
-        "void main() {" +
-        // the matrix must be included as a modifier of gl_Position
-        // Note that the uMVPMatrix factor *must be first* in order
-        // for the matrix multiplication product to be correct.
-        "  vec2 rotatedPosition = rotationMatrix * vPosition;" +
-        "  gl_Position = vec4(rotatedPosition.x * scaleX, rotatedPosition.y * scaleY, 0.0, 1.0);" +
-        "}"
-
-    override val fShaderCode =
-        "precision mediump float;" +
-        "uniform vec4 vColor;" +
-        "void main() {" +
-        "  gl_FragColor = vColor;" +
-        "}"
-
+class MonochromaticTriangleGLDescriptor(override val vShaderCode: String, override val fShaderCode: String, coords: Array<PointF>, val color: Color): Shape2DGLDescriptor, Shape2DGLAttributesDescriptor, Shape2DGLUniformsDescriptor{
     override val attributes = arrayOf(Attribute.Coordinates2D(coords) as Attribute)
 
     private var transformationMatrix = floatArrayOf(
