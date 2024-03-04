@@ -23,9 +23,7 @@ class MainActivity : AppCompatActivity() {
             it.setEGLContextClientVersion(2)
             it.setRenderer(object: Renderer{
                 private lateinit var triangle: GLShape
-                private val vPMatrix = FloatArray(16)
-                private val projectionMatrix = FloatArray(16)
-                private val viewMatrix = FloatArray(16)
+                private var ratio: Float = 0f
 
                 override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
                     assert(gl != null)
@@ -41,14 +39,11 @@ class MainActivity : AppCompatActivity() {
                         glViewport(0, 0, width, height)
 
                         // make adjustments for screen ratio
-                        val ratio: Float = width.toFloat() / height.toFloat()
+                        ratio = width.toFloat() / height.toFloat()
 
                         glMatrixMode(GL10.GL_PROJECTION)                                   // set matrix to projection mode
                         glLoadIdentity()                                                   // reset the matrix to its default state
                         glFrustumf(-ratio, ratio, -1f, 1f, 3f, 7f)  // apply the projection matrix
-                        Matrix.frustumM(projectionMatrix, 0, -ratio, ratio, -1f, 1f, 3f, 7f)
-                        Matrix.setLookAtM(viewMatrix, 0, 0f, 0f, 3f, 0f, 0f, 0f, 0f, 1.0f, 0.0f)
-                        Matrix.multiplyMM(vPMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
                     }
                 }
 
@@ -56,7 +51,11 @@ class MainActivity : AppCompatActivity() {
                     gl?.apply {
                         gl.glClear(GLES20.GL_COLOR_BUFFER_BIT)
                     }
-                    triangle.draw(vPMatrix)
+                    if(ratio > 1f) {
+                        triangle.draw(1f / ratio, 1f)
+                    } else {
+                        triangle.draw(1f, ratio)
+                    }
                 }
             })
         }
@@ -69,7 +68,6 @@ class MainActivity : AppCompatActivity() {
 interface Shape2DGLDescriptor {
     val vShaderCode: String
     val fShaderCode: String
-//    val transformationMatrix: Matrix
 }
 
 
@@ -92,13 +90,16 @@ interface Shape2DGLUniformsDescriptor {
 
 class MonochromaticTriangleGLDescriptor(coords: Array<PointF>, val color: Color): Shape2DGLDescriptor, Shape2DGLAttributesDescriptor, Shape2DGLUniformsDescriptor{
     override val vShaderCode =
-        "uniform mat4 uMVPMatrix;" +
-        "attribute vec4 vPosition;" +
+        "uniform mat2 uMVPMatrix;" +
+        "uniform float scaleX;" +
+        "uniform float scaleY;" +
+
+        "attribute vec2 vPosition;" +
         "void main() {" +
         // the matrix must be included as a modifier of gl_Position
         // Note that the uMVPMatrix factor *must be first* in order
         // for the matrix multiplication product to be correct.
-        "  gl_Position = uMVPMatrix * vPosition;" +
+        "  gl_Position = vec4(vPosition.x * scaleX, vPosition.y * scaleY, 0.0, 1.0);" +
         "}"
 
     override val fShaderCode =
@@ -120,10 +121,6 @@ class MonochromaticTriangleGLDescriptor(coords: Array<PointF>, val color: Color)
     fun setRotate(degrees: Float) {
 //        transformationMatrix.setRotate(degrees)
     }
-
-    fun setScale(scaleX: Float, scaleY: Float){
-//        transformationMatrix.setScale(scaleX, scaleY)
-    }
 }
 
 class GLShape(val descriptor: Shape2DGLDescriptor) {
@@ -143,14 +140,14 @@ class GLShape(val descriptor: Shape2DGLDescriptor) {
         }
     }
 
-    fun draw(projectionMatrix: FloatArray) {
+    fun draw(scaleX: Float, scaleY: Float) {
         GLES20.glUseProgram(program)
 
         // get handle to vertex shader's vPosition member
-        val positionHandle = GLES20.glGetAttribLocation(program, "vPosition").also {
+        val positionHandle = GLES20.glGetAttribLocation(program, "vPosition").also { attribLocation ->
 
             if(descriptor is Shape2DGLAttributesDescriptor) {
-                GLES20.glEnableVertexAttribArray(it)
+                GLES20.glEnableVertexAttribArray(attribLocation)
 
                 val requiredBufferSize = descriptor.attributes.sumOf { it.size }
 
@@ -172,7 +169,7 @@ class GLShape(val descriptor: Shape2DGLDescriptor) {
                 }
 
                 GLES20.glVertexAttribPointer(
-                    it,
+                    attribLocation,
                     coordsPerVertex,
                     GLES20.GL_FLOAT,
                     false,
@@ -203,15 +200,19 @@ class GLShape(val descriptor: Shape2DGLDescriptor) {
                 }
             }
 
-            GLES20.glGetUniformLocation(program, "uMVPMatrix").also {uMVPMatrixHandle ->
-                GLES20.glUniformMatrix4fv(uMVPMatrixHandle, 1, false, projectionMatrix, 0)
+            GLES20.glGetUniformLocation(program, "scaleX").also {scaleXHandle ->
+                GLES20.glUniform1f(scaleXHandle, scaleX)
+            }
+
+            GLES20.glGetUniformLocation(program, "scaleY").also {scaleYHandle ->
+                GLES20.glUniform1f(scaleYHandle, scaleY)
             }
 
             // Draw the triangle
             GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3)
 
             // Disable vertex array
-            GLES20.glDisableVertexAttribArray(it)
+            GLES20.glDisableVertexAttribArray(attribLocation)
         }
     }
 
