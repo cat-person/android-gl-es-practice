@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity() {
             Color.DKGRAY.toColor())
 
         binding.slider.addOnChangeListener{ _, value, _ ->
+            binding.angleTxt.text = "Angle: ${"%.0f".format(value)} degrees"
             triangleDescriptor.setRotation(value)
         }
 

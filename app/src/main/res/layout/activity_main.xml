@@ -13,6 +13,14 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"/>
 
+    <TextView
+        android:id="@+id/angle_txt"
+        android:layout_weight="0"
+        android:textSize="24sp"
+        android:gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
     <com.google.android.material.slider.Slider
         android:id="@+id/slider"
         android:layout_weight="0"
