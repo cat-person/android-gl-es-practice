@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">GL_ES_practice</string>
+    <string name="degrees_txt">Angle: %.0f degrees</string>
 </resources>

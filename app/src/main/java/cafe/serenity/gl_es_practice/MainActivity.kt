@@ -16,7 +16,6 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import cafe.serenity.gl_es_practice.databinding.ActivityMainBinding
-import com.google.android.material.slider.RangeSlider
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -61,8 +60,10 @@ class MainActivity : AppCompatActivity() {
                 PointF(.5f, -.5f)),
             Color.DKGRAY.toColor())
 
+        binding.angleTxt.text = getString(R.string.degrees_txt, binding.slider.value)
+
         binding.slider.addOnChangeListener{ _, value, _ ->
-            binding.angleTxt.text = "Angle: ${"%.0f".format(value)} degrees"
+            binding.angleTxt.text = getString(R.string.degrees_txt, value)
             triangleDescriptor.setRotation(value)
         }
 
@@ -206,7 +207,7 @@ class GLShape(val descriptor: Shape2DGLDescriptor) {
                     coordsPerVertex,
                     GLES20.GL_FLOAT,
                     false,
-                    8,
+                    coordsPerVertex * coordsByteSize,
                     buffer
                 )
 
