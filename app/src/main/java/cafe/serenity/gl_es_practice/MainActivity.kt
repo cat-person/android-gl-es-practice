@@ -3,7 +3,6 @@ package cafe.serenity.gl_es_practice
 import android.graphics.Color
 import android.graphics.PointF
 import android.opengl.GLES20
-import android.opengl.GLSurfaceView
 import android.opengl.GLSurfaceView.Renderer
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
@@ -16,11 +15,17 @@ import javax.microedition.khronos.opengles.GL10
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
-
+import cafe.serenity.gl_es_practice.databinding.ActivityMainBinding
+import com.google.android.material.slider.RangeSlider
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityMainBinding
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         lateinit var fShaderCode: String
         lateinit var vShaderCode: String
@@ -47,7 +52,20 @@ class MainActivity : AppCompatActivity() {
             // Log it
         }
 
-        val glSurfaceView = GLSurfaceView(this).also {
+        val triangleDescriptor = MonochromaticTriangleGLDescriptor(
+            vShaderCode,
+            fShaderCode,
+            arrayOf(
+                PointF(-.5f, -.5f),
+                PointF(.0f, .7f),
+                PointF(.5f, -.5f)),
+            Color.DKGRAY.toColor())
+
+        binding.slider.addOnChangeListener{ _, value, _ ->
+            triangleDescriptor.setRotation(value)
+        }
+
+        binding.surfaceView.also {
             it.setEGLContextClientVersion(2)
             it.setRenderer(object: Renderer{
                 private lateinit var triangle: GLShape
@@ -59,15 +77,6 @@ class MainActivity : AppCompatActivity() {
                     gl?.apply {
                         gl.glClearColor(1.0f, 1.0f, 1.0f, 1.0f)
                     }
-                    triangleDescriptor = MonochromaticTriangleGLDescriptor(
-                        vShaderCode,
-                        fShaderCode,
-                        arrayOf(
-                            PointF(-.5f, -.5f),
-                            PointF(.0f, .7f),
-                            PointF(.5f, -.5f)),
-                        Color.DKGRAY.toColor())
-                    triangleDescriptor.setRotation(-45f)
                     triangle = GLShape(triangleDescriptor)
                     triangle.descriptor
                 }
@@ -97,8 +106,6 @@ class MainActivity : AppCompatActivity() {
                 }
             })
         }
-
-        setContentView(glSurfaceView)
     }
 }
 
