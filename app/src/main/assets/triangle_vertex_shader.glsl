@@ -1,10 +1,7 @@
-uniform mat2 rotationMatrix;
-uniform float scaleX;
-uniform float scaleY;
-
-attribute vec2 vPosition;
+uniform mat2 transformationMatrix;
+attribute vec2 vCoordinates;
 
 void main() {
-    vec2 rotatedPosition = rotationMatrix * vPosition;
-    gl_Position = vec4(rotatedPosition.x * scaleX, rotatedPosition.y * scaleY, 0.0, 1.0);
+    vec2 transformedPosition = transformationMatrix * vCoordinates;
+    gl_Position = vec4(transformedPosition, 0.0, 1.0);
 }
