@@ -1,5 +1,7 @@
 package cafe.serenity.gl_es_practice
 
+import cafe.serenity.descriptor_renderer.GPUProgram
+
 class TriangleDescriptor(
     override val vShaderCode: String,
     override val fShaderCode: String,

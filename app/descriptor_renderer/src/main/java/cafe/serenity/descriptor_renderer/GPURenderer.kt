@@ -1,7 +1,6 @@
-package cafe.serenity.gl_es_practice
+package cafe.serenity.descriptor_renderer
 
 import android.opengl.GLES20
-import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.IntBuffer
@@ -55,7 +54,7 @@ object GPURenderer {
     private var color = floatArrayOf(1.0f, 0.0f, 0.0f, 1.0f)
 
     fun createProgram(gpuProgram: GPUProgram) {
-        this.gpuProgram = gpuProgram
+        GPURenderer.gpuProgram = gpuProgram
 
         vShaderHandle = loadShader(GLES20.GL_VERTEX_SHADER, gpuProgram.vShaderCode)
         fShaderHandle = loadShader(GLES20.GL_FRAGMENT_SHADER, gpuProgram.fShaderCode)
@@ -95,7 +94,7 @@ object GPURenderer {
             scaleX * cos(radians), scaleY * -sin(radians),
             scaleX * sin(radians), scaleY * cos(radians),
         )
-        this.color = color
+        GPURenderer.color = color
     }
 
     fun render() {

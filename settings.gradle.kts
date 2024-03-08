@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "GL_ES_practice"
 include(":app")
+include(":app:descriptor_renderer")

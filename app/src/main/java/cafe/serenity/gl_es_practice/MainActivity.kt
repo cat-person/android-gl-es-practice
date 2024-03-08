@@ -1,9 +1,11 @@
 package cafe.serenity.gl_es_practice
 
+import android.graphics.Color
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView.Renderer
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.toColor
 import cafe.serenity.gl_es_practice.databinding.ActivityMainBinding
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -28,16 +30,18 @@ class MainActivity : AppCompatActivity() {
                 .0f, .7f,
                 .5f, -.5f))
 
+        triangleDescriptor.setColor(Color.GRAY.toColor().components)
+
         binding.angleTxt.text = getString(R.string.degrees_txt, binding.slider.value)
 
         binding.slider.addOnChangeListener{ _, value, _ ->
             binding.angleTxt.text = getString(R.string.degrees_txt, value)
             triangleDescriptor.setRotation(value)
-            GPURenderer.updateDescriptor(triangleDescriptor)
+            cafe.serenity.descriptor_renderer.GPURenderer.updateDescriptor(triangleDescriptor)
         }
 
         binding.surfaceView.also {
-            it.setEGLContextClientVersion(EGL_CONTEXT_CLIENT_VERSION)
+            it.setEGLContextClientVersion(cafe.serenity.descriptor_renderer.EGL_CONTEXT_CLIENT_VERSION)
             it.setRenderer(object: Renderer{
 
                 override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -45,7 +49,7 @@ class MainActivity : AppCompatActivity() {
                     gl?.apply {
                         gl.glClearColor(1.0f, 1.0f, 1.0f, 1.0f)
                     }
-                    GPURenderer.createProgram(triangleDescriptor)
+                    cafe.serenity.descriptor_renderer.GPURenderer.createProgram(triangleDescriptor)
                 }
 
                 override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -66,14 +70,14 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         triangleDescriptor.setScale(1f, width.toFloat() / height.toFloat())
                     }
-                    GPURenderer.updateDescriptor(triangleDescriptor)
+                    cafe.serenity.descriptor_renderer.GPURenderer.updateDescriptor(triangleDescriptor)
                 }
 
                 override fun onDrawFrame(gl: GL10?) {
                     gl?.apply {
                         gl.glClear(GLES20.GL_COLOR_BUFFER_BIT)
                     }
-                    GPURenderer.render()
+                    cafe.serenity.descriptor_renderer.GPURenderer.render()
                 }
             })
         }
