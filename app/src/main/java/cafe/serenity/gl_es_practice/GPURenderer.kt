@@ -74,6 +74,15 @@ object GPURenderer {
         )
     }
 
+    fun updateDescriptor(gpuProgram: GPUProgram) {
+        updateParams(
+            gpuProgram.scaleX,
+            gpuProgram.scaleY,
+            gpuProgram.rotationDegrees,
+            gpuProgram.color
+        )
+    }
+
     private fun updateParams(
         scaleX: Float,
         scaleY: Float,
@@ -92,19 +101,14 @@ object GPURenderer {
     fun render() {
         GLES20.glUseProgram(programHandle)
 
-        Log.e("AAAA", "transformationMatrixLocation: $transformationMatrixLocation,  colorUniformLocation: $colorUniformLocation")
-
-        Log.e("AAAA", "programHandle: $programHandle")
-        Log.e("AAAA", "vCoordinatesAttributeLocation: $vCoordinatesAttributeLocation,  coordinates: [${gpuProgram.vCoordinates.joinToString(", ")}]")
-
         // get handle to vertex shader's vPosition member
         GLES20.glEnableVertexAttribArray(vCoordinatesAttributeLocation)
 
         val requiredBufferSize = coordsByteSize * gpuProgram.vCoordinates.size
 
-        val buffer = ByteBuffer.allocateDirect(requiredBufferSize).run {
-            order(ByteOrder.nativeOrder())
-            asFloatBuffer().put(gpuProgram.vCoordinates)
+        val buffer = ByteBuffer.allocateDirect(requiredBufferSize).also {
+            it.order(ByteOrder.nativeOrder())
+            it.asFloatBuffer().put(gpuProgram.vCoordinates)
         }
 
         GLES20.glVertexAttribPointer(

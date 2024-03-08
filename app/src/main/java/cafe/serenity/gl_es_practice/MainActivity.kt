@@ -11,8 +11,6 @@ import javax.microedition.khronos.opengles.GL10
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
-
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -35,6 +33,7 @@ class MainActivity : AppCompatActivity() {
         binding.slider.addOnChangeListener{ _, value, _ ->
             binding.angleTxt.text = getString(R.string.degrees_txt, value)
             triangleDescriptor.setRotation(value)
+            GPURenderer.updateDescriptor(triangleDescriptor)
         }
 
         binding.surfaceView.also {
@@ -67,6 +66,7 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         triangleDescriptor.setScale(1f, width.toFloat() / height.toFloat())
                     }
+                    GPURenderer.updateDescriptor(triangleDescriptor)
                 }
 
                 override fun onDrawFrame(gl: GL10?) {
